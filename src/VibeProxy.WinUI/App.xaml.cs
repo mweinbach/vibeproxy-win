@@ -18,6 +18,16 @@ public partial class App : Application
     {
         InitializeComponent();
 
+        LogService.Initialize();
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            LogService.Write("Unhandled exception", args.ExceptionObject as Exception);
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogService.Write("Unobserved task exception", args.Exception);
+        };
+
         var settingsStore = new SettingsStore();
         var authManager = new AuthManager();
         var configManager = new ConfigManager();
@@ -36,12 +46,21 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        LogService.Write("App launched");
         _window = new MainWindow(Services.MainViewModel);
         _window.ShowWindow();
 
-        Services.NotificationService.Register();
-        Services.TrayService.Initialize();
-        Services.TrayService.UpdateRunning(Services.ServerManager.IsRunning, Services.ServerManager.ProxyPort);
+        try
+        {
+            Services.NotificationService.Register();
+            Services.TrayService.Initialize();
+            Services.TrayService.UpdateRunning(Services.ServerManager.IsRunning, Services.ServerManager.ProxyPort);
+            LogService.Write("Tray initialized");
+        }
+        catch (Exception ex)
+        {
+            LogService.Write("Tray init failed", ex);
+        }
 
         Services.TrayService.OpenSettingsRequested += () => ShowMainWindow();
         Services.TrayService.ToggleServerRequested += async () =>
@@ -77,7 +96,9 @@ public partial class App : Application
         _ = Task.Run(async () =>
         {
             await Services.MainViewModel.InitializeAsync().ConfigureAwait(false);
+            LogService.Write("MainViewModel initialized");
             await Services.ServerManager.StartAsync().ConfigureAwait(false);
+            LogService.Write("Server start requested");
         });
     }
 
