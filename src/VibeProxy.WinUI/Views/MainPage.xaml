@@ -32,7 +32,8 @@
             </Border>
 
             <StackPanel Spacing="8">
-                <ToggleSwitch x:Name="LaunchToggle" Header="Launch at login" Toggled="OnLaunchAtLoginToggled" />
+                <ToggleSwitch x:Name="LaunchToggle" Header="Launch at login" Toggled="OnLaunchAtLoginToggled"
+                              OnContent="" OffContent="" MinWidth="0" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="Auth files" VerticalAlignment="Center" />
                     <Button Content="Open Folder" Click="OnOpenAuthFolderClicked" />
@@ -47,7 +48,8 @@
                         <Expander IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
                             <Expander.Header>
                                 <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" VerticalAlignment="Center">
-                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" VerticalAlignment="Center"
+                                                  OnContent="" OffContent="" MinWidth="0" />
                                     <Image Width="20" Height="20" Source="{x:Bind IconSource}" />
                                     <TextBlock Grid.Column="2" Text="{x:Bind DisplayName}" VerticalAlignment="Center" />
                                     <ProgressRing Grid.Column="3" Width="16" Height="16" IsActive="{x:Bind IsAuthenticating}" Visibility="{x:Bind IsAuthenticating, Converter={StaticResource BoolToVisibility}}" />
@@ -73,7 +75,9 @@
                                 </ItemsControl>
 
                                 <StackPanel Visibility="{x:Bind ShowVercelControls, Converter={StaticResource BoolToVisibility}}" Spacing="6">
-                                    <ToggleSwitch Header="Use Vercel AI Gateway" IsOn="{Binding ElementName=Root, Path=ViewModel.SettingsStore.VercelGatewayEnabled, Mode=TwoWay}" />
+                                    <ToggleSwitch Header="Use Vercel AI Gateway"
+                                                  IsOn="{Binding ElementName=Root, Path=ViewModel.SettingsStore.VercelGatewayEnabled, Mode=TwoWay}"
+                                                  OnContent="" OffContent="" MinWidth="0" />
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBlock Text="Vercel API key" VerticalAlignment="Center" FontSize="12" />
                                         <TextBox Width="220" Text="{Binding ElementName=Root, Path=ViewModel.SettingsStore.VercelApiKey, Mode=TwoWay}" />
