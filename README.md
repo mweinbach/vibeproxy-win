@@ -40,9 +40,7 @@ scripts/
 
 ## Packaging (MSIX)
 - Configure the publisher in `src/VibeProxy.WinUI/Package.appxmanifest` to match your signing cert.
-- Update the release URL placeholders in:
-  - `src/VibeProxy.WinUI/App.xaml.cs`
-  - `src/VibeProxy.WinUI/Views/MainPage.xaml`
+- Release URLs currently point to `https://github.com/mweinbach/vibeproxy-win` and can be adjusted if the repo moves.
 - Build with MSIX enabled:
   ```
   dotnet build .\src\VibeProxy.WinUI\VibeProxy.WinUI.csproj -c Release -p:GenerateAppxPackageOnBuild=true

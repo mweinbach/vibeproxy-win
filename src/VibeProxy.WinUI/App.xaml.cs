@@ -8,7 +8,7 @@ namespace VibeProxy.WinUI;
 
 public partial class App : Application
 {
-    private const string ReleasesUrl = "https://github.com/YOUR_GITHUB_USERNAME/vibeproxy-win/releases";
+    private const string ReleasesUrl = "https://github.com/mweinbach/vibeproxy-win/releases";
 
     private MainWindow? _window;
 

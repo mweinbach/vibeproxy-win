@@ -100,7 +100,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
                     <TextBlock Text="© 2026 Automaze, Ltd." FontSize="12" Foreground="Gray" />
                 </StackPanel>
-                <HyperlinkButton Content="Report an issue" NavigateUri="https://github.com/YOUR_GITHUB_USERNAME/vibeproxy-win/issues" />
+                <HyperlinkButton Content="Report an issue" NavigateUri="https://github.com/mweinbach/vibeproxy-win/issues" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>
