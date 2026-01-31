@@ -13,9 +13,11 @@ public sealed class MainWindow : WindowEx
         Title = "VibeProxy";
         var page = new MainPage();
         page.Initialize(viewModel);
+        viewModel.AttachDispatcher(DispatcherQueue);
         Content = page;
 
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 760));
+        CenterOnScreen();
         AppWindow.Closing += OnClosing;
     }
 
@@ -27,7 +29,33 @@ public sealed class MainWindow : WindowEx
 
     public void ShowWindow()
     {
+        CenterOnScreen();
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsAlwaysOnTop = true;
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(1000);
+                presenter.IsAlwaysOnTop = false;
+            });
+        }
+
         AppWindow.Show();
         Activate();
+    }
+
+    private void CenterOnScreen()
+    {
+        var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+        if (displayArea is null)
+        {
+            return;
+        }
+
+        var workArea = displayArea.WorkArea;
+        var size = AppWindow.Size;
+        var x = workArea.X + Math.Max(0, (workArea.Width - size.Width) / 2);
+        var y = workArea.Y + Math.Max(0, (workArea.Height - size.Height) / 2);
+        AppWindow.Move(new Windows.Graphics.PointInt32(x, y));
     }
 }

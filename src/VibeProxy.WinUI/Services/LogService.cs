@@ -14,6 +14,7 @@ public static class LogService
         var baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VibeProxy", "logs");
         Directory.CreateDirectory(baseDir);
         _logPath = Path.Combine(baseDir, "app.log");
+        File.WriteAllText(_logPath, string.Empty);
         Write("Log initialized");
     }
 

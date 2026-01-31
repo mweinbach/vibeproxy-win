@@ -8,7 +8,9 @@
         <!-- WinUI 3 -->
         <UseWinUI>true</UseWinUI>
         <EnableMsixTooling>true</EnableMsixTooling>
-        <WindowsPackageType>MSIX</WindowsPackageType>
+        <WindowsPackageType Condition="'$(GenerateAppxPackageOnBuild)'=='true'">MSIX</WindowsPackageType>
+        <WindowsPackageType Condition="'$(GenerateAppxPackageOnBuild)'!='true'">None</WindowsPackageType>
+        <WindowsAppSDKSelfContained Condition="'$(GenerateAppxPackageOnBuild)'!='true'">true</WindowsAppSDKSelfContained>
 
         <!-- Project Options -->
         <Nullable>enable</Nullable>

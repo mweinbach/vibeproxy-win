@@ -79,7 +79,8 @@ public sealed class SettingsStore
             }
 
             var json = File.ReadAllText(_settingsPath);
-            var data = JsonSerializer.Deserialize<SettingsData>(json);
+            var options = new JsonSerializerOptions { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
+            var data = JsonSerializer.Deserialize<SettingsData>(json, options);
             return data ?? new SettingsData();
         }
         catch
@@ -92,7 +93,8 @@ public sealed class SettingsStore
     {
         try
         {
-            var json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
+            var options = new JsonSerializerOptions { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(), WriteIndented = true };
+            var json = JsonSerializer.Serialize(_data, options);
             File.WriteAllText(_settingsPath, json);
         }
         catch

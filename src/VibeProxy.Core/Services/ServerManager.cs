@@ -322,10 +322,8 @@ public sealed class ServerManager
                 ["created"] = timestamp
             };
 
-            var json = System.Text.Json.JsonSerializer.Serialize(authData, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var options = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(), WriteIndented = true };
+            var json = System.Text.Json.JsonSerializer.Serialize(authData, options);
             File.WriteAllText(filePath, json);
             AddLog($"✓ Z.AI API key saved to {filename}");
             return (true, "API key saved successfully");

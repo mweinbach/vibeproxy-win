@@ -20,7 +20,8 @@ public sealed class ProxyConfigWriter
             VercelApiKey = vercelApiKey ?? string.Empty
         };
 
-        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        var options = new JsonSerializerOptions { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(), WriteIndented = true };
+        var json = JsonSerializer.Serialize(payload, options);
         File.WriteAllText(ConfigPath, json);
     }
 

@@ -13,6 +13,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly ServerManager _serverManager;
     private readonly VibeProxy.Core.Utils.Debouncer _authDebouncer = new(TimeSpan.FromMilliseconds(500));
     private FileSystemWatcher? _authWatcher;
+    private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
 
     private bool _isServerRunning;
 
@@ -43,7 +44,7 @@ public sealed class MainViewModel : ObservableObject
         _authManager.AccountsUpdated += UpdateAccounts;
         _serverManager.RunningChanged += running =>
         {
-            IsServerRunning = running;
+            RunOnUI(() => IsServerRunning = running);
         };
 
         IsServerRunning = _serverManager.IsRunning;
@@ -74,6 +75,11 @@ public sealed class MainViewModel : ObservableObject
     {
         await RefreshAuthAsync().ConfigureAwait(false);
         StartAuthWatcher();
+    }
+
+    public void AttachDispatcher(Microsoft.UI.Dispatching.DispatcherQueue dispatcher)
+    {
+        _dispatcher = dispatcher;
     }
 
     public async Task RefreshAuthAsync()
@@ -134,17 +140,20 @@ public sealed class MainViewModel : ObservableObject
 
     private void UpdateAccounts(IReadOnlyDictionary<ServiceType, ServiceAccounts> accounts)
     {
-        foreach (var service in Services)
+        RunOnUI(() =>
         {
-            if (accounts.TryGetValue(service.Type, out var serviceAccounts))
+            foreach (var service in Services)
             {
-                service.RefreshAccounts(serviceAccounts.Accounts);
+                if (accounts.TryGetValue(service.Type, out var serviceAccounts))
+                {
+                    service.RefreshAccounts(serviceAccounts.Accounts);
+                }
+                else
+                {
+                    service.RefreshAccounts(Array.Empty<AuthAccount>());
+                }
             }
-            else
-            {
-                service.RefreshAccounts(Array.Empty<AuthAccount>());
-            }
-        }
+        });
     }
 
     private void StartAuthWatcher()
@@ -170,6 +179,17 @@ public sealed class MainViewModel : ObservableObject
     private void DebouncedRefresh()
     {
         _authDebouncer.Execute(() => _ = RefreshAuthAsync());
+    }
+
+    private void RunOnUI(Action action)
+    {
+        if (_dispatcher is null || _dispatcher.HasThreadAccess)
+        {
+            action();
+            return;
+        }
+
+        _dispatcher.TryEnqueue(() => action());
     }
 
     private IEnumerable<ServiceViewModel> CreateServices()
