@@ -1,5 +1,6 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 using VibeProxy.WinUI.ViewModels;
 using VibeProxy.WinUI.Views;
 using WinUIEx;
@@ -11,6 +12,11 @@ public sealed class MainWindow : WindowEx
     public MainWindow(MainViewModel viewModel)
     {
         Title = "VibeProxy";
+        
+        // Enable Mica backdrop
+        SystemBackdrop = new MicaBackdrop();
+        ExtendsContentIntoTitleBar = true;
+        
         var page = new MainPage();
         page.Initialize(viewModel);
         viewModel.AttachDispatcher(DispatcherQueue);
@@ -18,6 +24,14 @@ public sealed class MainWindow : WindowEx
 
         AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 760));
         CenterOnScreen();
+        
+        // Set the app icon explicitly for the taskbar
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.scale-200.png");
+        if (File.Exists(iconPath))
+        {
+            AppWindow.SetIcon(iconPath);
+        }
+
         AppWindow.Closing += OnClosing;
     }
 

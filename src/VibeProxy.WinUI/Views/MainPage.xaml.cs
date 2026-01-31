@@ -22,6 +22,22 @@ public sealed partial class MainPage : Page
         ViewModel.ConnectFlowRequested += HandleConnectAsync;
         ViewModel.RemoveFlowRequested += HandleRemoveAsync;
         Loaded += OnLoaded;
+        
+        NavView.SelectedItem = NavView.MenuItems[0];
+    }
+
+    private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItem is NavigationViewItem item)
+        {
+            var tag = item.Tag.ToString();
+            DashboardSection.Visibility = tag == "Dashboard" ? Visibility.Visible : Visibility.Collapsed;
+            ServicesSection.Visibility = tag == "Services" ? Visibility.Visible : Visibility.Collapsed;
+            SettingsSection.Visibility = tag == "Settings" ? Visibility.Visible : Visibility.Collapsed;
+            AboutSection.Visibility = tag == "About" ? Visibility.Visible : Visibility.Collapsed;
+            
+            ContentScrollViewer.ScrollToVerticalOffset(0);
+        }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -71,6 +87,16 @@ public sealed partial class MainPage : Page
             Arguments = authDir,
             UseShellExecute = true
         });
+    }
+
+    private void OnCopyUrlClicked(object sender, RoutedEventArgs e)
+    {
+        var services = ((App)Application.Current).Services;
+        var url = $"http://localhost:{services.ServerManager.ProxyPort}";
+        var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        dataPackage.SetText(url);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+        services.NotificationService.Show("Copied", "Server URL copied to clipboard");
     }
 
     private async void OnToggleServerClicked(object sender, RoutedEventArgs e)

@@ -16,96 +16,180 @@
         <helpers:ExpiredToBrushConverter x:Key="ExpiredBrush" />
         <helpers:StringToVisibilityConverter x:Key="StringToVisibility" />
         <helpers:BoolToStatusBrushConverter x:Key="StatusBrush" />
+        <helpers:StatusToSeverityConverter x:Key="StatusToSeverityConverter" />
     </Page.Resources>
 
-    <ScrollViewer>
-        <StackPanel Padding="24" Spacing="20">
-            <TextBlock Text="VibeProxy" FontSize="24" FontWeight="SemiBold" />
+    <Grid>
+        <NavigationView x:Name="NavView"
+                        PaneDisplayMode="Left"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
+                        SelectionChanged="OnNavSelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Dashboard" Tag="Dashboard" Icon="Home" />
+                <NavigationViewItem Content="Services" Tag="Services" Icon="Characters" />
+                <NavigationViewItem Content="Settings" Tag="Settings" Icon="Setting" />
+                <NavigationViewItem Content="About" Tag="About" Icon="Info" />
+            </NavigationView.MenuItems>
 
-            <Border Background="#10101010" CornerRadius="8" Padding="12">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch" Spacing="12">
-                    <TextBlock Text="Server status" VerticalAlignment="Center" />
-                    <Ellipse Width="8" Height="8" Fill="{x:Bind ViewModel.IsServerRunning, Converter={StaticResource StatusBrush}}" />
-                    <TextBlock Text="{x:Bind ViewModel.ServerStatusText}" VerticalAlignment="Center" />
-                    <Button Content="Toggle" Click="OnToggleServerClicked" />
-                </StackPanel>
-            </Border>
+            <NavigationView.Content>
+                <ScrollViewer x:Name="ContentScrollViewer" Padding="24">
+                    <Grid>
+                        <!-- Dashboard Section -->
+                        <StackPanel x:Name="DashboardSection" Spacing="24">
+                            <TextBlock Text="Dashboard" Style="{StaticResource HeaderTextBlockStyle}" />
+                            
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <StackPanel Spacing="16">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <FontIcon Glyph="&#xE73E;" Foreground="{x:Bind ViewModel.IsServerRunning, Converter={StaticResource StatusBrush}}" />
+                                        <TextBlock Text="Server Status" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                        <TextBlock Text="{x:Bind ViewModel.ServerStatusText}" VerticalAlignment="Center" Foreground="Gray" />
+                                    </StackPanel>
+                                    
+                                    <InfoBar IsOpen="True" 
+                                             Severity="{x:Bind ViewModel.IsServerRunning, Mode=OneWay, Converter={StaticResource StatusToSeverityConverter}}"
+                                             Title="{x:Bind ViewModel.ServerStatusText}"
+                                             Message="Proxy server is active and listening for local requests."
+                                             IsClosable="False" />
 
-            <StackPanel Spacing="8">
-                <ToggleSwitch x:Name="LaunchToggle" Header="Launch at login" Toggled="OnLaunchAtLoginToggled"
-                              OnContent="" OffContent="" MinWidth="0" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="Auth files" VerticalAlignment="Center" />
-                    <Button Content="Open Folder" Click="OnOpenAuthFolderClicked" />
-                </StackPanel>
-            </StackPanel>
+                                    <Button Content="Toggle Server" 
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            Click="OnToggleServerClicked" 
+                                            HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Border>
 
-            <TextBlock Text="Services" FontSize="18" FontWeight="SemiBold" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Environment" FontWeight="SemiBold" />
+                                        <TextBlock Text="Port: 8317 (Thinking), 8318 (Backend)" FontSize="12" Foreground="Gray" />
+                                        <Button Content="Copy URL" Click="OnCopyUrlClicked" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource CardBorderStyle}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Auth Files" FontWeight="SemiBold" />
+                                        <TextBlock Text="Manage your tokens locally" FontSize="12" Foreground="Gray" />
+                                        <Button Content="Open Folder" Click="OnOpenAuthFolderClicked" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
 
-            <ItemsControl ItemsSource="{x:Bind ViewModel.Services}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:ServiceViewModel">
-                        <Expander IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
-                            <Expander.Header>
-                                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" VerticalAlignment="Center">
-                                    <ToggleSwitch IsOn="{x:Bind IsEnabled, Mode=TwoWay}" VerticalAlignment="Center"
-                                                  OnContent="" OffContent="" MinWidth="0" />
-                                    <Image Width="20" Height="20" Source="{x:Bind IconSource}" />
-                                    <TextBlock Grid.Column="2" Text="{x:Bind DisplayName}" VerticalAlignment="Center" />
-                                    <ProgressRing Grid.Column="3" Width="16" Height="16" IsActive="{x:Bind IsAuthenticating}" Visibility="{x:Bind IsAuthenticating, Converter={StaticResource BoolToVisibility}}" />
-                                    <Button Grid.Column="4" Content="Add Account" Click="OnConnectClicked" IsEnabled="{x:Bind IsEnabled}" />
-                                </Grid>
-                            </Expander.Header>
-                            <StackPanel Spacing="8" Padding="8,4,8,8">
-                                <TextBlock Text="Provider disabled" FontSize="12" Foreground="Gray"
-                                           Visibility="{x:Bind IsEnabled, Converter={StaticResource InverseBoolToVisibility}}" />
-                                <StackPanel Spacing="8" Visibility="{x:Bind IsEnabled, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="{x:Bind SummaryText}" FontSize="12" Foreground="Gray" />
-                                <ItemsControl ItemsSource="{x:Bind Accounts}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="viewModels:AuthAccountViewModel">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Ellipse Width="6" Height="6" Fill="{x:Bind IsExpired, Converter={StaticResource ExpiredBrush}}" VerticalAlignment="Center" />
-                                                <TextBlock Text="{x:Bind DisplayName}" FontSize="12" VerticalAlignment="Center" />
-                                                <TextBlock Text="(expired)" FontSize="12" Foreground="Orange" Visibility="{x:Bind IsExpired, Converter={StaticResource BoolToVisibility}}" />
-                                                <Button Content="Remove" Command="{x:Bind RemoveCommand}" CommandParameter="{x:Bind}" />
+                        <!-- Services Section -->
+                        <StackPanel x:Name="ServicesSection" Spacing="24" Visibility="Collapsed">
+                            <TextBlock Text="Internal Services" Style="{StaticResource HeaderTextBlockStyle}" />
+                            
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Services}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="viewModels:ServiceViewModel">
+                                        <Expander HorizontalAlignment="Stretch" Padding="0">
+                                            <Expander.Header>
+                                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                                                    <Image Width="24" Height="24" Source="{x:Bind IconSource}" />
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="{x:Bind SummaryText}" FontSize="12" Foreground="Gray" />
+                                                    </StackPanel>
+                                                    <ProgressRing Grid.Column="2" Width="16" Height="16" IsActive="{x:Bind IsAuthenticating}" Visibility="{x:Bind IsAuthenticating, Converter={StaticResource BoolToVisibility}}" />
+                                                    <ToggleSwitch Grid.Column="3" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Expander.Header>
+                                            <StackPanel Spacing="12" Padding="16">
+                                                <ItemsControl ItemsSource="{x:Bind Accounts}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="viewModels:AuthAccountViewModel">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="0,0,0,8">
+                                                                <Ellipse Width="8" Height="8" Fill="{x:Bind IsExpired, Converter={StaticResource ExpiredBrush}}" VerticalAlignment="Center" />
+                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{x:Bind DisplayName}" FontSize="13" />
+                                                                    <TextBlock Text="Expired" FontSize="11" Foreground="Orange" Visibility="{x:Bind IsExpired, Converter={StaticResource BoolToVisibility}}" />
+                                                                </StackPanel>
+                                                                <Button Grid.Column="2" Content="Remove" Command="{x:Bind RemoveCommand}" CommandParameter="{x:Bind}" FontSize="12" Padding="8,4" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
+                                                <Button Content="Connect Account" 
+                                                        Command="{x:Bind ConnectCommand}"
+                                                        IsEnabled="{x:Bind IsEnabled}"
+                                                        HorizontalAlignment="Stretch"
+                                                        Margin="0,8,0,0" />
+
+                                                <TextBlock Text="{x:Bind HelpText}" FontSize="12" Foreground="Gray" Style="{StaticResource CaptionTextBlockStyle}"
+                                                           Visibility="{x:Bind HelpText, Converter={StaticResource StringToVisibility}}" />
                                             </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                        </Expander>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
 
-                                <StackPanel Visibility="{x:Bind ShowVercelControls, Converter={StaticResource BoolToVisibility}}" Spacing="6">
-                                    <ToggleSwitch Header="Use Vercel AI Gateway"
+                        <!-- Settings Section -->
+                        <StackPanel x:Name="SettingsSection" Spacing="24" Visibility="Collapsed">
+                            <TextBlock Text="Settings" Style="{StaticResource HeaderTextBlockStyle}" />
+                            
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <StackPanel Spacing="16">
+                                    <ToggleSwitch Header="Launch at Login" 
+                                                  x:Name="LaunchToggle"
+                                                  Toggled="OnLaunchAtLoginToggled"
+                                                  OnContent="Enabled" OffContent="Disabled" />
+                                    
+                                    <TextBlock Text="VibeProxy will automatically start when you sign in to Windows." FontSize="12" Foreground="Gray" Margin="0,-8,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="Vercel AI Gateway" FontWeight="SemiBold" />
+                                    <ToggleSwitch Header="Use Gateway for Claude"
                                                   IsOn="{Binding ElementName=Root, Path=ViewModel.SettingsStore.VercelGatewayEnabled, Mode=TwoWay}"
-                                                  OnContent="" OffContent="" MinWidth="0" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="Vercel API key" VerticalAlignment="Center" FontSize="12" />
-                                        <TextBox Width="220" Text="{Binding ElementName=Root, Path=ViewModel.SettingsStore.VercelApiKey, Mode=TwoWay}" />
+                                                  OnContent="On" OffContent="Off" />
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Vercel API Key" FontSize="12" />
+                                        <PasswordBox Password="{Binding ElementName=Root, Path=ViewModel.SettingsStore.VercelApiKey, Mode=TwoWay}" PlaceholderText="Enter API Key" />
                                     </StackPanel>
                                 </StackPanel>
+                            </Border>
+                        </StackPanel>
 
-                                <TextBlock Text="{x:Bind HelpText}" FontSize="12" Foreground="Gray"
-                                           Visibility="{x:Bind HelpText, Converter={StaticResource StringToVisibility}}" />
+                        <!-- About Section -->
+                        <StackPanel x:Name="AboutSection" Spacing="24" Visibility="Collapsed">
+                            <TextBlock Text="About" Style="{StaticResource HeaderTextBlockStyle}" />
+                            
+                            <Border Style="{StaticResource CardBorderStyle}">
+                                <StackPanel Spacing="20" HorizontalAlignment="Center">
+                                    <Image Source="ms-appx:///Assets/Icons/glyph.png" Width="96" Height="96" />
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <TextBlock Text="VibeProxy" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Version 1.0.0" Foreground="Gray" HorizontalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="Native Windows companion for VibeProxy with full feature parity to the macOS version. Orchestrate your AI workflows seamlessly."
+                                               TextAlignment="Center" TextWrapping="Wrap" MaxWidth="400" />
+
+                                    <StackPanel Spacing="12">
+                                        <HyperlinkButton Content="Project Repository" NavigateUri="https://github.com/mweinbach/vibeproxy-win" HorizontalAlignment="Center" />
+                                        <HyperlinkButton Content="CLIProxyAPIPlus" NavigateUri="https://github.com/router-for-me/CLIProxyAPIPlus" HorizontalAlignment="Center" />
+                                        <HyperlinkButton Content="Report an issue" NavigateUri="https://github.com/mweinbach/vibeproxy-win/issues" HorizontalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,8" />
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="© 2026 Automaze, Ltd." FontSize="13" Foreground="Gray" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Licensed under MIT" FontSize="12" Foreground="Gray" HorizontalAlignment="Center" />
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Expander>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <StackPanel Spacing="4" HorizontalAlignment="Center">
-                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                    <TextBlock Text="VibeProxy" FontSize="12" Foreground="Gray" />
-                    <TextBlock Text="|" FontSize="12" Foreground="Gray" />
-                    <HyperlinkButton Content="CLIProxyAPIPlus" NavigateUri="https://github.com/router-for-me/CLIProxyAPIPlus" />
-                    <TextBlock Text="|" FontSize="12" Foreground="Gray" />
-                    <TextBlock Text="License: MIT" FontSize="12" Foreground="Gray" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                    <TextBlock Text="© 2026 Automaze, Ltd." FontSize="12" Foreground="Gray" />
-                </StackPanel>
-                <HyperlinkButton Content="Report an issue" NavigateUri="https://github.com/mweinbach/vibeproxy-win/issues" />
-            </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </NavigationView.Content>
+        </NavigationView>
+    </Grid>
 </Page>

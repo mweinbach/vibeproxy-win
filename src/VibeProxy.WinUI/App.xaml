@@ -14,35 +14,38 @@
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
             <!-- Other app resources here -->
-            <Color x:Key="Primary">#512BD4</Color>
+            <!-- Modern color palette -->
+            <Color x:Key="AppPrimaryColor">#0078D4</Color>
+            <Color x:Key="AppSecondaryColor">#2B88D8</Color>
+            <Color x:Key="AppBackgroundTertiary">#1A1A1A</Color>
+            
+            <SolidColorBrush x:Key="AppPrimaryBrush" Color="{StaticResource AppPrimaryColor}" />
+            <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppSecondaryColor}" />
+            
+            <StaticResource x:Key="NavigationViewContentGridForeground" ResourceKey="TextFillColorPrimaryBrush" />
+            <StaticResource x:Key="NavigationViewItemBackgroundSelected" ResourceKey="SubtleFillColorSecondaryBrush" />
 
-            <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}" />
-            <SolidColorBrush x:Key="WhiteBrush" Color="White" />
-            <SolidColorBrush x:Key="BlackBrush" Color="Black" />
-
-            <x:Double x:Key="AppFontSize">14</x:Double>
-
-            <Style x:Key="MyLabel" TargetType="TextBlock">
-                <Setter Property="Foreground"
-                        Value="{StaticResource PrimaryBrush}" />
+            <Style TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="CornerRadius" Value="6" />
             </Style>
 
-            <Style x:Key="Action" TargetType="Button">
-                <Setter Property="FontSize"
-                        Value="{StaticResource AppFontSize}" />
-                <Setter Property="Padding"
-                        Value="14,10" />
+            <Style x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="Background" Value="{StaticResource AppPrimaryBrush}" />
+                <Setter Property="Foreground" Value="White" />
+                <Setter Property="CornerRadius" Value="6" />
             </Style>
 
-            <Style x:Key="PrimaryAction"
-                   TargetType="Button"
-                   BasedOn="{StaticResource Action}">
-                <Setter Property="Background"
-                        Value="{StaticResource PrimaryBrush}" />
-                <Setter Property="CornerRadius"
-                        Value="8" />
-                <Setter Property="Foreground"
-                        Value="{StaticResource WhiteBrush}" />
+            <Style TargetType="Expander">
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Margin" Value="0,0,0,8" />
+            </Style>
+
+            <Style x:Key="CardBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
