@@ -1,0 +1,78 @@
+name: windows-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - name: Build thinking proxy
+        run: |
+          go build -o src/VibeProxy.WinUI/Resources/bin/thinking-proxy.exe ./src/VibeProxy.Proxy
+
+      - name: Build cli-proxy-api-plus
+        shell: pwsh
+        run: |
+          git clone https://github.com/router-for-me/CLIProxyAPIPlus cli-proxy-api-plus
+          Push-Location cli-proxy-api-plus
+          go build -o cli-proxy-api-plus.exe ./cmd/server
+          Copy-Item cli-proxy-api-plus.exe ..\src\VibeProxy.WinUI\Resources\bin\cli-proxy-api-plus.exe -Force
+          Pop-Location
+
+      - name: Decode signing certificate
+        shell: pwsh
+        run: |
+          $pfxPath = "$env:RUNNER_TEMP\vibeproxy.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
+          echo "PFX_PATH=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        env:
+          PFX_BASE64: ${{ secrets.PFX_BASE64 }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build MSIX
+        shell: pwsh
+        run: |
+          dotnet build src/VibeProxy.WinUI/VibeProxy.WinUI.csproj -c Release `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateKeyFile=\"$env:PFX_PATH\" `
+            -p:PackageCertificatePassword=${{ secrets.PFX_PASSWORD }} `
+            -p:GenerateAppInstallerFile=true `
+            -p:AppInstallerFileName=VibeProxy.appinstaller `
+            -p:AppInstallerUri=\"https://github.com/${{ github.repository_owner }}/vibeproxy-win/releases/download/${{ github.ref_name }}/VibeProxy.appinstaller\" `
+            -p:AppInstallerUpdateFrequency=1 `
+            -p:AppInstallerUpdateFrequencyUnit=Day
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: msix
+          path: |
+            src/VibeProxy.WinUI/AppPackages/**/*.msix
+            src/VibeProxy.WinUI/AppPackages/**/*.appinstaller
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src/VibeProxy.WinUI/AppPackages/**/*.msix
+            src/VibeProxy.WinUI/AppPackages/**/*.appinstaller

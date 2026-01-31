@@ -1,0 +1,34 @@
+# Build outputs
+bin/
+obj/
+*.appx
+*.appxbundle
+*.msix
+*.msixupload
+*.appinstaller
+*.pdb
+*.log
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+*.nupkg
+
+# Go
+/vendor/
+*.exe
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.pfx
+*.cer
+*.snk
+
+# Local settings
+config/local*
