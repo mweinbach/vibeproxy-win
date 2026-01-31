@@ -8,17 +8,13 @@ namespace VibeProxy.WinUI.Views;
 
 public sealed partial class MainPage : Page
 {
-    public MainViewModel ViewModel { get; private set; } = null!;
+    public MainViewModel ViewModel { get; }
 
-    public MainPage()
-    {
-        InitializeComponent();
-    }
-
-    public void Initialize(MainViewModel viewModel)
+    public MainPage(MainViewModel viewModel)
     {
         ViewModel = viewModel;
         DataContext = ViewModel;
+        InitializeComponent();
         ViewModel.ConnectFlowRequested += HandleConnectAsync;
         ViewModel.RemoveFlowRequested += HandleRemoveAsync;
         Loaded += OnLoaded;

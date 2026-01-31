@@ -13,12 +13,18 @@ public sealed class MainWindow : WindowEx
     {
         Title = "VibeProxy";
         
-        // Enable Mica backdrop
-        SystemBackdrop = new MicaBackdrop();
-        ExtendsContentIntoTitleBar = true;
+        // Enable Mica backdrop (safe fallback if unavailable)
+        try
+        {
+            SystemBackdrop = new MicaBackdrop();
+            ExtendsContentIntoTitleBar = true;
+        }
+        catch (Exception ex)
+        {
+            VibeProxy.WinUI.Services.LogService.Write("Mica backdrop unavailable", ex);
+        }
         
-        var page = new MainPage();
-        page.Initialize(viewModel);
+        var page = new MainPage(viewModel);
         viewModel.AttachDispatcher(DispatcherQueue);
         Content = page;
 

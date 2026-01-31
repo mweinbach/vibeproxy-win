@@ -47,8 +47,16 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         LogService.Write("App launched");
-        _window = new MainWindow(Services.MainViewModel);
-        _window.ShowWindow();
+        try
+        {
+            _window = new MainWindow(Services.MainViewModel);
+            _window.ShowWindow();
+            LogService.Write("Window shown");
+        }
+        catch (Exception ex)
+        {
+            LogService.Write("Window show failed", ex);
+        }
 
         try
         {
