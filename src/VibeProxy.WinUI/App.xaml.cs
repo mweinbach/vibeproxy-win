@@ -37,7 +37,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         _window = new MainWindow(Services.MainViewModel);
-        _window.AppWindow.Hide();
+        _window.ShowWindow();
 
         Services.NotificationService.Register();
         Services.TrayService.Initialize();
