@@ -68,7 +68,7 @@ public partial class App : Application
         LogService.Write("App launched");
         try
         {
-            _window = new MainWindow(Services.MainViewModel);
+            _window = new MainWindow(Services.MainViewModel, Services.TrayService);
             _window.ShowWindow();
             LogService.Write("Window shown");
         }

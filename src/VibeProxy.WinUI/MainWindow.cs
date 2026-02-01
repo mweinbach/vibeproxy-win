@@ -1,6 +1,7 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using VibeProxy.WinUI.Services;
 using VibeProxy.WinUI.ViewModels;
 using VibeProxy.WinUI.Views;
 using WinUIEx;
@@ -9,8 +10,14 @@ namespace VibeProxy.WinUI;
 
 public sealed class MainWindow : WindowEx
 {
-    public MainWindow(MainViewModel viewModel)
+    private readonly TrayService? _trayService;
+    private const string TaskbarLightIcon = "icon-taskbar-light.ico";
+    private const string TaskbarDarkIcon = "icon-taskbar-dark.ico";
+    private string? _currentIconPath;
+
+    public MainWindow(MainViewModel viewModel, TrayService trayService)
     {
+        _trayService = trayService;
         Title = "VibeProxy";
         
         // Enable Mica backdrop (safe fallback if unavailable)
@@ -30,12 +37,15 @@ public sealed class MainWindow : WindowEx
 
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 850));
         CenterOnScreen();
-        
-        // Set the app icon explicitly for the taskbar
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.scale-200.png");
-        if (File.Exists(iconPath))
+
+        if (page is FrameworkElement root)
         {
-            AppWindow.SetIcon(iconPath);
+            root.ActualThemeChanged += (_, _) => UpdateTaskbarIcon(root.ActualTheme);
+            UpdateTaskbarIcon(root.ActualTheme);
+        }
+        else
+        {
+            UpdateTaskbarIcon(ElementTheme.Default);
         }
 
         AppWindow.Closing += OnClosing;
@@ -77,5 +87,39 @@ public sealed class MainWindow : WindowEx
         var x = workArea.X + Math.Max(0, (workArea.Width - size.Width) / 2);
         var y = workArea.Y + Math.Max(0, (workArea.Height - size.Height) / 2);
         AppWindow.Move(new Windows.Graphics.PointInt32(x, y));
+    }
+
+    private void UpdateTaskbarIcon(ElementTheme theme)
+    {
+        var useLightIcon = theme switch
+        {
+            ElementTheme.Dark => true,
+            ElementTheme.Light => false,
+            _ => Application.Current.RequestedTheme == ApplicationTheme.Dark
+        };
+
+        var iconName = useLightIcon ? TaskbarLightIcon : TaskbarDarkIcon;
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", iconName);
+
+        if (!File.Exists(iconPath))
+        {
+            var fallback = Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.scale-200.png");
+            if (!File.Exists(fallback))
+            {
+                return;
+            }
+
+            iconPath = fallback;
+        }
+
+        if (string.Equals(iconPath, _currentIconPath, StringComparison.OrdinalIgnoreCase))
+        {
+            _trayService?.UpdateTheme(theme);
+            return;
+        }
+
+        AppWindow.SetIcon(iconPath);
+        _currentIconPath = iconPath;
+        _trayService?.UpdateTheme(theme);
     }
 }
