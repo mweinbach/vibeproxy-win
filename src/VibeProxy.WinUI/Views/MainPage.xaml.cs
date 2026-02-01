@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using VibeProxy.Core.Models;
@@ -107,8 +108,10 @@ public sealed partial class MainPage : Page
         else
         {
             var success = await services.ServerManager.StartAsync();
-            services.NotificationService.Show(success ? "Server Started" : "Server Failed",
-                success ? "VibeProxy is now running" : "Could not start server");
+            var message = success
+                ? "VibeProxy is now running"
+                : services.ServerManager.Logs.LastOrDefault() ?? "Could not start server";
+            services.NotificationService.Show(success ? "Server Started" : "Server Failed", message);
         }
     }
 

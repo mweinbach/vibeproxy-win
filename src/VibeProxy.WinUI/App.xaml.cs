@@ -11,6 +11,7 @@ public partial class App : Application
     private const string ReleasesUrl = "https://github.com/mweinbach/vibeproxy-win/releases";
 
     private MainWindow? _window;
+    private int _lastServerLogCount;
 
     public AppServices Services { get; }
 
@@ -38,6 +39,20 @@ public partial class App : Application
         var proxyConfigWriter = new ProxyConfigWriter();
         var serverManager = new ServerManager(configManager, settingsStore, proxyConfigWriter);
         serverManager.SetResourceBasePath(AppContext.BaseDirectory);
+        serverManager.LogUpdated += logs =>
+        {
+            if (logs.Count <= _lastServerLogCount)
+            {
+                return;
+            }
+
+            for (var i = _lastServerLogCount; i < logs.Count; i++)
+            {
+                LogService.Write($"[Server] {logs[i]}");
+            }
+
+            _lastServerLogCount = logs.Count;
+        };
 
         var notificationService = new NotificationService();
         var trayService = new TrayService();
