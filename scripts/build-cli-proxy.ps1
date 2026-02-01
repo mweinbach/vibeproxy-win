@@ -6,6 +6,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$gitCmd = Get-Command git -ErrorAction SilentlyContinue
+if (-not $gitCmd) {
+    throw "Git not found on PATH. Install Git for Windows or add it to PATH."
+}
+
 $goCmd = Get-Command go -ErrorAction SilentlyContinue
 if ($goCmd) {
     $goExe = $goCmd.Source

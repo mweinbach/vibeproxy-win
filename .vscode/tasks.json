@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ensure Resources Binaries (Go + Backend)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\ensure-binaries.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build WinUI (Debug x64)",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}\\src\\VibeProxy.WinUI\\VibeProxy.WinUI.csproj",
+        "-c",
+        "Debug",
+        "-r",
+        "win-x64"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Build (Debug, All)",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Ensure Resources Binaries (Go + Backend)",
+        "Build WinUI (Debug x64)"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -12,7 +12,7 @@ Native Windows companion for VibeProxy with feature parity to the macOS app.
 
 ## Requirements
 - Windows 10+ (Desktop)
-- .NET 8/10 SDK
+- .NET 10 SDK (and Visual Studio with .NET 10 support)
 - Go 1.22+
 - Git
 
@@ -37,6 +37,18 @@ scripts/
    ```
    dotnet build .\src\VibeProxy.WinUI\VibeProxy.WinUI.csproj -c Release
    ```
+
+## Debug (Visual Studio)
+- Open `VibeProxy.sln`
+- Set startup project to `VibeProxy.WinUI`
+- Select the `x64` platform (toolbar dropdown)
+- Press `F5` (Debug)
+
+On Debug builds, `src/VibeProxy.WinUI/VibeProxy.WinUI.csproj` runs `scripts/ensure-binaries.ps1` to build `thinking-proxy.exe` + `cli-proxy-api-plus.exe` if they're missing.
+
+If you don't have Go installed yet, the app UI can still run, but the proxy/backend won't start until Go is installed.
+
+To skip the auto-build step during Debug builds: set MSBuild property `VibeProxyEnsureBinaries=false`.
 
 ## Packaging (MSIX)
 - Configure the publisher in `src/VibeProxy.WinUI/Package.appxmanifest` to match your signing cert.

@@ -9,6 +9,7 @@ public sealed class TrayService
     private readonly Uri _activeIcon = new("ms-appx:///Assets/Icons/icon-active.png");
     private readonly Uri _inactiveIcon = new("ms-appx:///Assets/Icons/icon-inactive.png");
 
+    private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
     private TaskbarIcon? _trayIcon;
     private MenuFlyoutItem? _statusItem;
     private MenuFlyoutItem? _startStopItem;
@@ -20,8 +21,9 @@ public sealed class TrayService
     public event Action? CheckUpdatesRequested;
     public event Action? QuitRequested;
 
-    public void Initialize()
+    public void Initialize(Microsoft.UI.Dispatching.DispatcherQueue dispatcher)
     {
+        _dispatcher = dispatcher;
         _trayIcon = new TaskbarIcon
         {
             IconSource = new BitmapImage(_inactiveIcon),
@@ -62,6 +64,12 @@ public sealed class TrayService
 
     public void UpdateRunning(bool isRunning, int port)
     {
+        if (_dispatcher is not null && !_dispatcher.HasThreadAccess)
+        {
+            _dispatcher.TryEnqueue(() => UpdateRunning(isRunning, port));
+            return;
+        }
+
         if (_trayIcon is null)
         {
             return;

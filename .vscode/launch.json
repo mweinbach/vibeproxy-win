@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug WinUI (Unpackaged, x64)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build (Debug, All)",
+      "program": "${workspaceFolder}\\src\\VibeProxy.WinUI\\bin\\Debug\\net10.0-windows10.0.19041.0\\win-x64\\VibeProxy.WinUI.exe",
+      "cwd": "${workspaceFolder}\\src\\VibeProxy.WinUI\\bin\\Debug\\net10.0-windows10.0.19041.0\\win-x64",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Debug WinUI (UI Only, x64)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build WinUI (Debug x64)",
+      "program": "${workspaceFolder}\\src\\VibeProxy.WinUI\\bin\\Debug\\net10.0-windows10.0.19041.0\\win-x64\\VibeProxy.WinUI.exe",
+      "cwd": "${workspaceFolder}\\src\\VibeProxy.WinUI\\bin\\Debug\\net10.0-windows10.0.19041.0\\win-x64",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Attach to Process",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ]
+}

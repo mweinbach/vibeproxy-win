@@ -74,4 +74,15 @@
     <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
         <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <VibeProxyEnsureBinaries Condition="'$(VibeProxyEnsureBinaries)'==''">true</VibeProxyEnsureBinaries>
+    </PropertyGroup>
+
+    <Target Name="VibeProxyEnsureBinaries" BeforeTargets="Build"
+            Condition="'$(VibeProxyEnsureBinaries)'=='true' and '$(Configuration)'=='Debug'">
+        <Message Importance="high" Text="Ensuring proxy/backend binaries (Debug)..." />
+        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\ensure-binaries.ps1&quot;"
+              ContinueOnError="true" />
+    </Target>
 </Project>

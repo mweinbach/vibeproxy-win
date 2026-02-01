@@ -19,6 +19,10 @@ public partial class App : Application
         InitializeComponent();
 
         LogService.Initialize();
+        UnhandledException += (_, args) =>
+        {
+            LogService.Write("WinUI unhandled exception", args.Exception);
+        };
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             LogService.Write("Unhandled exception", args.ExceptionObject as Exception);
@@ -61,7 +65,7 @@ public partial class App : Application
         try
         {
             Services.NotificationService.Register();
-            Services.TrayService.Initialize();
+            Services.TrayService.Initialize(Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread());
             Services.TrayService.UpdateRunning(Services.ServerManager.IsRunning, Services.ServerManager.ProxyPort);
             LogService.Write("Tray initialized");
         }
@@ -103,10 +107,17 @@ public partial class App : Application
 
         _ = Task.Run(async () =>
         {
-            await Services.MainViewModel.InitializeAsync().ConfigureAwait(false);
-            LogService.Write("MainViewModel initialized");
-            await Services.ServerManager.StartAsync().ConfigureAwait(false);
-            LogService.Write("Server start requested");
+            try
+            {
+                await Services.MainViewModel.InitializeAsync().ConfigureAwait(false);
+                LogService.Write("MainViewModel initialized");
+                await Services.ServerManager.StartAsync().ConfigureAwait(false);
+                LogService.Write("Server start requested");
+            }
+            catch (Exception ex)
+            {
+                LogService.Write("Background startup failed", ex);
+            }
         });
     }
 

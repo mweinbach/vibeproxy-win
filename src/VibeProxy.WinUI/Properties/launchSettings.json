@@ -1,10 +1,10 @@
 {
   "profiles": {
-    "VibeProxy.WinUI (Package)": {
-      "commandName": "MsixPackage"
-    },
     "VibeProxy.WinUI (Unpackaged)": {
       "commandName": "Project"
+    },
+    "VibeProxy.WinUI (Package)": {
+      "commandName": "MsixPackage"
     }
   }
 }
