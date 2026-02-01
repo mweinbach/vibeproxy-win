@@ -22,6 +22,7 @@
     <Grid>
         <NavigationView x:Name="NavView"
                         PaneDisplayMode="Left"
+                        IsPaneOpen="False"
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="False"
                         SelectionChanged="OnNavSelectionChanged">
@@ -49,11 +50,13 @@
             </NavigationView.MenuItems>
 
             <NavigationView.Content>
-                <ScrollViewer x:Name="ContentScrollViewer" Padding="24">
-                    <Grid>
+                <ScrollViewer x:Name="ContentScrollViewer" 
+                              Padding="24"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <Grid MaxWidth="1300" HorizontalAlignment="Left">
                         <!-- Dashboard Section -->
                         <StackPanel x:Name="DashboardSection" Spacing="24">
-                            <TextBlock Text="Dashboard" Style="{StaticResource HeaderTextBlockStyle}" />
                             
                             <Border Style="{StaticResource CardBorderStyle}">
                                 <StackPanel Spacing="16">
@@ -96,7 +99,6 @@
 
                         <!-- Services Section -->
                         <StackPanel x:Name="ServicesSection" Spacing="24" Visibility="Collapsed">
-                            <TextBlock Text="Internal Services" Style="{StaticResource HeaderTextBlockStyle}" />
                             
                             <ItemsControl ItemsSource="{x:Bind ViewModel.Services}">
                                 <ItemsControl.ItemTemplate>
@@ -146,7 +148,6 @@
 
                         <!-- Settings Section -->
                         <StackPanel x:Name="SettingsSection" Spacing="24" Visibility="Collapsed">
-                            <TextBlock Text="Settings" Style="{StaticResource HeaderTextBlockStyle}" />
                             
                             <Border Style="{StaticResource CardBorderStyle}">
                                 <StackPanel Spacing="16">
@@ -175,7 +176,6 @@
 
                         <!-- About Section -->
                         <StackPanel x:Name="AboutSection" Spacing="24" Visibility="Collapsed">
-                            <TextBlock Text="About" Style="{StaticResource HeaderTextBlockStyle}" />
                             
                             <Border Style="{StaticResource CardBorderStyle}">
                                 <StackPanel Spacing="20" HorizontalAlignment="Center">

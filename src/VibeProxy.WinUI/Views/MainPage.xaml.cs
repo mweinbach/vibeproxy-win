@@ -26,6 +26,7 @@ public sealed partial class MainPage : Page
     {
         if (args.SelectedItem is NavigationViewItem item)
         {
+            NavView.Header = item.Content;
             var tag = item.Tag.ToString();
             DashboardSection.Visibility = tag == "Dashboard" ? Visibility.Visible : Visibility.Collapsed;
             ServicesSection.Visibility = tag == "Services" ? Visibility.Visible : Visibility.Collapsed;

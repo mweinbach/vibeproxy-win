@@ -28,7 +28,7 @@ public sealed class MainWindow : WindowEx
         viewModel.AttachDispatcher(DispatcherQueue);
         Content = page;
 
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 760));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 850));
         CenterOnScreen();
         
         // Set the app icon explicitly for the taskbar
