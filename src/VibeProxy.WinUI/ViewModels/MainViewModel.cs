@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using Microsoft.UI.Xaml;
 using VibeProxy.Core.Models;
 using VibeProxy.Core.Services;
 using VibeProxy.WinUI.Helpers;
@@ -60,6 +61,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string ServerStatusText => IsServerRunning ? "Running" : "Stopped";
 
     public SettingsStore SettingsStore => _settingsStore;
+
+    public void UpdateIconTheme(ElementTheme theme)
+    {
+        foreach (var service in Services)
+        {
+            service.UpdateIconTheme(theme);
+        }
+    }
 
     public event Func<ServiceViewModel, Task>? ConnectFlowRequested;
     public event Func<AuthAccountViewModel, Task>? RemoveFlowRequested;
@@ -309,16 +318,33 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     private static IEnumerable<ServiceViewModel> CreateServices()
     {
-        yield return new ServiceViewModel(ServiceType.Antigravity, "ms-appx:///Assets/Icons/icon-antigravity.png",
+        yield return new ServiceViewModel(ServiceType.Antigravity,
+            "ms-appx:///Assets/Icons/icon-antigravity-light.png",
+            "ms-appx:///Assets/Icons/icon-antigravity-dark.png",
             "Antigravity provides OAuth-based access to various AI models including Gemini and Claude.");
-        yield return new ServiceViewModel(ServiceType.Claude, "ms-appx:///Assets/Icons/icon-claude.png", null);
-        yield return new ServiceViewModel(ServiceType.Codex, "ms-appx:///Assets/Icons/icon-codex.png", null);
-        yield return new ServiceViewModel(ServiceType.Gemini, "ms-appx:///Assets/Icons/icon-gemini.png",
+        yield return new ServiceViewModel(ServiceType.Claude,
+            "ms-appx:///Assets/Icons/icon-claude-light.png",
+            "ms-appx:///Assets/Icons/icon-claude-dark.png",
+            null);
+        yield return new ServiceViewModel(ServiceType.Codex,
+            "ms-appx:///Assets/Icons/icon-codex-light.png",
+            "ms-appx:///Assets/Icons/icon-codex-dark.png",
+            null);
+        yield return new ServiceViewModel(ServiceType.Gemini,
+            "ms-appx:///Assets/Icons/icon-gemini-light.png",
+            "ms-appx:///Assets/Icons/icon-gemini-dark.png",
             "If you have multiple projects, the default project will be used.");
-        yield return new ServiceViewModel(ServiceType.Copilot, "ms-appx:///Assets/Icons/icon-copilot.png",
+        yield return new ServiceViewModel(ServiceType.Copilot,
+            "ms-appx:///Assets/Icons/icon-copilot-light.png",
+            "ms-appx:///Assets/Icons/icon-copilot-dark.png",
             "GitHub Copilot provides access to Claude, GPT, Gemini and other models.");
-        yield return new ServiceViewModel(ServiceType.Qwen, "ms-appx:///Assets/Icons/icon-qwen.png", null);
-        yield return new ServiceViewModel(ServiceType.Zai, "ms-appx:///Assets/Icons/icon-zai.png",
+        yield return new ServiceViewModel(ServiceType.Qwen,
+            "ms-appx:///Assets/Icons/icon-qwen-light.png",
+            "ms-appx:///Assets/Icons/icon-qwen-dark.png",
+            null);
+        yield return new ServiceViewModel(ServiceType.Zai,
+            "ms-appx:///Assets/Icons/icon-zai-light.png",
+            "ms-appx:///Assets/Icons/icon-zai-dark.png",
             "Z.AI GLM provides access to GLM-4.7 via API key.");
     }
 

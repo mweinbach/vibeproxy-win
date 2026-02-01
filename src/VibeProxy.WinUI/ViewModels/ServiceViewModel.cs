@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media.Imaging;
 using VibeProxy.Core.Models;
 using VibeProxy.WinUI.Helpers;
 
@@ -10,11 +12,16 @@ public sealed class ServiceViewModel : ObservableObject
     private bool _isAuthenticating;
     private bool _isExpanded;
     private bool _isDisposed;
+    private readonly string _lightIconUri;
+    private readonly string _darkIconUri;
+    private BitmapImage _iconSource;
 
-    public ServiceViewModel(ServiceType type, string iconUri, string? helpText)
+    public ServiceViewModel(ServiceType type, string lightIconUri, string darkIconUri, string? helpText)
     {
         Type = type;
-        IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(iconUri));
+        _lightIconUri = lightIconUri;
+        _darkIconUri = darkIconUri;
+        _iconSource = new BitmapImage(new Uri(lightIconUri));
         HelpText = helpText;
         Accounts = new ObservableCollection<AuthAccountViewModel>();
         ConnectCommand = new RelayCommand(() => OnConnectRequested());
@@ -22,7 +29,11 @@ public sealed class ServiceViewModel : ObservableObject
     }
 
     public ServiceType Type { get; }
-    public Microsoft.UI.Xaml.Media.Imaging.BitmapImage IconSource { get; }
+    public BitmapImage IconSource
+    {
+        get => _iconSource;
+        private set => SetProperty(ref _iconSource, value);
+    }
     public string? HelpText { get; }
 
     public string DisplayName => Type.DisplayName();
@@ -82,6 +93,19 @@ public sealed class ServiceViewModel : ObservableObject
 
             return active > 0 ? "1 connected account" : "1 connected account (expired)";
         }
+    }
+
+    public void UpdateIconTheme(ElementTheme theme)
+    {
+        var useLightIcons = theme switch
+        {
+            ElementTheme.Dark => true,
+            ElementTheme.Light => false,
+            _ => Application.Current?.RequestedTheme == ApplicationTheme.Dark
+        };
+
+        var nextUri = useLightIcons ? _lightIconUri : _darkIconUri;
+        IconSource = new BitmapImage(new Uri(nextUri));
     }
 
     public void RefreshAccounts(IEnumerable<AuthAccount> accounts)

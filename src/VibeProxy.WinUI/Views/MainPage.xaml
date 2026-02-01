@@ -106,7 +106,7 @@
                                         <Expander HorizontalAlignment="Stretch" Padding="0">
                                             <Expander.Header>
                                                 <Grid ColumnDefinitions="Auto,*,24,Auto" ColumnSpacing="12" VerticalAlignment="Center">
-                                                    <Image Width="24" Height="24" Source="{x:Bind IconSource}" />
+                                                    <Image Width="24" Height="24" Source="{x:Bind IconSource, Mode=OneWay}" />
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" />
                                                         <TextBlock Text="{x:Bind SummaryText}" FontSize="12" Foreground="Gray" />

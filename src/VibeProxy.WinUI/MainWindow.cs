@@ -38,14 +38,20 @@ public sealed class MainWindow : WindowEx
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1100, 850));
         CenterOnScreen();
 
+        void ApplyTheme(ElementTheme theme)
+        {
+            UpdateTaskbarIcon(theme);
+            viewModel.UpdateIconTheme(theme);
+        }
+
         if (page is FrameworkElement root)
         {
-            root.ActualThemeChanged += (_, _) => UpdateTaskbarIcon(root.ActualTheme);
-            UpdateTaskbarIcon(root.ActualTheme);
+            root.ActualThemeChanged += (_, _) => ApplyTheme(root.ActualTheme);
+            ApplyTheme(root.ActualTheme);
         }
         else
         {
-            UpdateTaskbarIcon(ElementTheme.Default);
+            ApplyTheme(ElementTheme.Default);
         }
 
         AppWindow.Closing += OnClosing;
