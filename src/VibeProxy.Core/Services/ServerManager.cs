@@ -4,20 +4,26 @@ using VibeProxy.Core.Utils;
 
 namespace VibeProxy.Core.Services;
 
-public sealed class ServerManager
+public sealed class ServerManager : IDisposable
 {
     private const int DefaultProxyPort = 8317;
     private const int DefaultBackendPort = 8318;
+    private const int HealthCheckIntervalMs = 5000;
+    private const int MaxConsecutiveFailures = 3;
+    private const int PortWaitTimeoutSeconds = 5;
 
     private readonly RingBuffer<string> _logBuffer = new(1000);
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly ConfigManager _configManager;
     private readonly SettingsStore _settingsStore;
     private readonly ProxyConfigWriter _proxyConfigWriter;
+    private readonly Timer _healthCheckTimer;
 
     private Process? _proxyProcess;
     private Process? _backendProcess;
     private string? _resourceBasePath;
+    private int _consecutiveFailures;
+    private bool _isDisposed;
 
     public event Action<bool>? RunningChanged;
     public event Action<IReadOnlyList<string>>? LogUpdated;
@@ -28,13 +34,15 @@ public sealed class ServerManager
 
     public ServerManager(ConfigManager configManager, SettingsStore settingsStore, ProxyConfigWriter proxyConfigWriter)
     {
-        _configManager = configManager;
-        _settingsStore = settingsStore;
-        _proxyConfigWriter = proxyConfigWriter;
+        _configManager = configManager ?? throw new ArgumentNullException(nameof(configManager));
+        _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
+        _proxyConfigWriter = proxyConfigWriter ?? throw new ArgumentNullException(nameof(proxyConfigWriter));
+        _healthCheckTimer = new Timer(OnHealthCheckTick, null, Timeout.Infinite, HealthCheckIntervalMs);
     }
 
     public void SetResourceBasePath(string basePath)
     {
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
         _resourceBasePath = basePath;
     }
 
@@ -52,38 +60,33 @@ public sealed class ServerManager
 
     public IReadOnlyList<string> Logs => _logBuffer.ToList();
 
-    public async Task<bool> StartAsync()
+    public async Task<bool> StartAsync(CancellationToken cancellationToken = default)
     {
-        await _lifecycleLock.WaitAsync().ConfigureAwait(false);
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
+
+        await _lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (IsRunning)
             {
+                AddLog("Server is already running");
                 return true;
             }
 
-            KillOrphanedProcesses();
+            _consecutiveFailures = 0;
 
-            if (ProxyExecutablePath is null || !File.Exists(ProxyExecutablePath))
+            // Validate prerequisites
+            if (!ValidatePrerequisites())
             {
-                AddLog($"❌ Missing thinking proxy at {ProxyExecutablePath ?? "(null)"}");
                 return false;
             }
 
-            if (BackendExecutablePath is null || !File.Exists(BackendExecutablePath))
-            {
-                AddLog($"❌ Missing cli-proxy-api-plus at {BackendExecutablePath ?? "(null)"}");
-                return false;
-            }
+            // Clean up any orphaned processes
+            await KillOrphanedProcessesAsync().ConfigureAwait(false);
 
-            if (BaseConfigPath is null || !File.Exists(BaseConfigPath))
-            {
-                AddLog("❌ Missing config.yaml");
-                return false;
-            }
-
+            // Sync and generate configuration
             SyncProxyConfig();
-            var mergedConfigPath = _configManager.GetMergedConfigPath(BaseConfigPath, _settingsStore);
+            var mergedConfigPath = _configManager.GetMergedConfigPath(BaseConfigPath!, _settingsStore);
 
             if (!File.Exists(mergedConfigPath))
             {
@@ -91,29 +94,66 @@ public sealed class ServerManager
                 return false;
             }
 
-            if (!StartProxy())
+            // Start proxy with retry
+            if (!await StartProxyWithRetryAsync(cancellationToken).ConfigureAwait(false))
             {
+                AddLog("❌ Failed to start thinking proxy after retries");
                 return false;
             }
 
-            var proxyReady = await WaitForPortAsync(ProxyPort, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+            // Wait for proxy port with extended timeout
+            var proxyReady = await WaitForPortAsync(ProxyPort, TimeSpan.FromSeconds(PortWaitTimeoutSeconds), cancellationToken).ConfigureAwait(false);
             if (!proxyReady)
             {
-                AddLog("❌ Thinking proxy failed to start");
-                StopProxy();
+                AddLog($"❌ Thinking proxy failed to respond on port {ProxyPort}");
+                await CleanupProcessesAsync().ConfigureAwait(false);
                 return false;
             }
 
-            if (!StartBackend(mergedConfigPath))
+            // Start backend
+            if (!await StartBackendAsync(mergedConfigPath, cancellationToken).ConfigureAwait(false))
             {
-                StopProxy();
+                AddLog("❌ Failed to start backend");
+                await CleanupProcessesAsync().ConfigureAwait(false);
                 return false;
             }
 
+            // Verify backend port
+            var backendReady = await WaitForPortAsync(BackendPort, TimeSpan.FromSeconds(PortWaitTimeoutSeconds), cancellationToken).ConfigureAwait(false);
+            if (!backendReady)
+            {
+                AddLog($"❌ Backend failed to respond on port {BackendPort}");
+                await CleanupProcessesAsync().ConfigureAwait(false);
+                return false;
+            }
+
+            // Start health monitoring
+            _healthCheckTimer.Change(HealthCheckIntervalMs, HealthCheckIntervalMs);
+
+            // Update state (outside lock to prevent reentrancy)
+            var wasRunning = IsRunning;
             IsRunning = true;
             AddLog($"✓ Server started on port {ProxyPort}");
-            RunningChanged?.Invoke(true);
+            
+            // Fire event outside the lock
+            if (!wasRunning)
+            {
+                _ = Task.Run(() => RunningChanged?.Invoke(true));
+            }
+
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            AddLog("❌ Server start cancelled");
+            await CleanupProcessesAsync().ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AddLog($"❌ Failed to start server: {ex.Message}");
+            await CleanupProcessesAsync().ConfigureAwait(false);
+            return false;
         }
         finally
         {
@@ -121,16 +161,14 @@ public sealed class ServerManager
         }
     }
 
-    public async Task StopAsync()
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        await _lifecycleLock.WaitAsync().ConfigureAwait(false);
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
+
+        await _lifecycleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            StopBackend();
-            StopProxy();
-            IsRunning = false;
-            AddLog("✓ Server stopped");
-            RunningChanged?.Invoke(false);
+            await StopInternalAsync().ConfigureAwait(false);
         }
         finally
         {
@@ -140,11 +178,13 @@ public sealed class ServerManager
 
     public void SyncProxyConfig()
     {
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
         _proxyConfigWriter.Write(_settingsStore.VercelGatewayEnabled, _settingsStore.VercelApiKey);
     }
 
     public void RefreshConfig()
     {
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
         if (BaseConfigPath is null || !File.Exists(BaseConfigPath))
         {
             return;
@@ -153,8 +193,10 @@ public sealed class ServerManager
         _ = _configManager.GetMergedConfigPath(BaseConfigPath, _settingsStore);
     }
 
-    public async Task<AuthResult> RunAuthCommandAsync(AuthCommand command, string? qwenEmail = null)
+    public async Task<AuthResult> RunAuthCommandAsync(AuthCommand command, string? qwenEmail = null, CancellationToken cancellationToken = default)
     {
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
+
         if (BackendExecutablePath is null || !File.Exists(BackendExecutablePath))
         {
             return new AuthResult(false, "Backend binary not found");
@@ -202,6 +244,8 @@ public sealed class ServerManager
         }
 
         var outputBuffer = new List<string>();
+        var tcs = new TaskCompletionSource<bool>();
+        
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
 
         try
@@ -213,6 +257,7 @@ public sealed class ServerManager
                     outputBuffer.Add(args.Data);
                 }
             };
+            
             process.ErrorDataReceived += (_, args) =>
             {
                 if (!string.IsNullOrWhiteSpace(args.Data))
@@ -221,89 +266,66 @@ public sealed class ServerManager
                 }
             };
 
+            process.Exited += (_, _) => tcs.TrySetResult(true);
+
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
             AddLog($"✓ Authentication process started (PID: {process.Id})");
 
-            if (command == AuthCommand.GeminiLogin)
+            // Schedule input writes based on command type
+            var inputTasks = ScheduleAuthInputAsync(process, command, qwenEmail, cancellationToken);
+
+            // Wait for process to exit or timeout
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromMinutes(2)); // 2 minute timeout for auth
+
+            try
             {
-                _ = Task.Run(async () =>
+                await tcs.Task.WaitAsync(cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Timeout - process is still running
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return new AuthResult(true, "Browser opened for authentication. Complete the login in your browser.");
+            }
+
+            var output = string.Join("\n", outputBuffer);
+            
+            if (output.Contains("Opening browser", StringComparison.OrdinalIgnoreCase) || process.ExitCode == 0)
+            {
+                if (command == AuthCommand.CopilotLogin)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
-                    if (!process.HasExited)
+                    var code = ExtractCopilotCode(outputBuffer);
+                    if (!string.IsNullOrWhiteSpace(code))
                     {
-                        await process.StandardInput.WriteLineAsync().ConfigureAwait(false);
+                        return new AuthResult(true, 
+                            $"🌐 Browser opened for GitHub authentication.\n\n📋 Code: {code}\n\nJust paste it in the browser!\n\nThe app will automatically detect when you're authenticated.", 
+                            code);
                     }
-                });
-            }
-
-            if (command == AuthCommand.CodexLogin)
-            {
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(12)).ConfigureAwait(false);
-                    if (!process.HasExited)
-                    {
-                        await process.StandardInput.WriteLineAsync().ConfigureAwait(false);
-                    }
-                });
-            }
-
-            if (command == AuthCommand.QwenLogin && !string.IsNullOrWhiteSpace(qwenEmail))
-            {
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
-                    if (!process.HasExited)
-                    {
-                        await process.StandardInput.WriteLineAsync(qwenEmail!).ConfigureAwait(false);
-                    }
-                });
-            }
-
-            if (command == AuthCommand.CopilotLogin)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-            }
-            else
-            {
-                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
-            }
-
-            if (process.HasExited)
-            {
-                var output = string.Join("\n", outputBuffer);
-                if (output.Contains("Opening browser", StringComparison.OrdinalIgnoreCase))
-                {
-                    return new AuthResult(true, "Browser opened for authentication. Complete the login in your browser.");
                 }
 
-                return process.ExitCode == 0
-                    ? new AuthResult(true, "Browser opened for authentication. Complete the login in your browser.")
-                    : new AuthResult(false, string.IsNullOrWhiteSpace(output) ? "Authentication failed" : output);
+                return new AuthResult(true, "Browser opened for authentication. Complete the login in your browser.");
             }
 
-            if (command == AuthCommand.CopilotLogin)
-            {
-                var code = ExtractCopilotCode(outputBuffer);
-                if (!string.IsNullOrWhiteSpace(code))
-                {
-                    return new AuthResult(true, $"🌐 Browser opened for GitHub authentication.\n\n📋 Code: {code}\n\nJust paste it in the browser!\n\nThe app will automatically detect when you're authenticated.", code);
-                }
-            }
-
-            return new AuthResult(true, "Browser opened for authentication. Complete the login in your browser.");
+            return new AuthResult(false, string.IsNullOrWhiteSpace(output) ? "Authentication failed" : output);
         }
         catch (Exception ex)
         {
             return new AuthResult(false, $"Failed to start auth process: {ex.Message}");
         }
+        finally
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+        }
     }
 
     public (bool ok, string message) SaveZaiApiKey(string apiKey)
     {
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ServerManager));
+
         try
         {
             var authDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cli-proxy-api");
@@ -322,7 +344,11 @@ public sealed class ServerManager
                 ["created"] = timestamp
             };
 
-            var options = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(), WriteIndented = true };
+            var options = new System.Text.Json.JsonSerializerOptions 
+            { 
+                TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(), 
+                WriteIndented = true 
+            };
             var json = System.Text.Json.JsonSerializer.Serialize(authData, options);
             File.WriteAllText(filePath, json);
             AddLog($"✓ Z.AI API key saved to {filename}");
@@ -334,12 +360,72 @@ public sealed class ServerManager
         }
     }
 
-    private bool StartProxy()
+    public void Dispose()
     {
-        if (ProxyExecutablePath is null)
+        if (_isDisposed) return;
+        
+        _isDisposed = true;
+        _healthCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        _healthCheckTimer?.Dispose();
+        
+        try
         {
+            StopInternalAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Best effort cleanup
+        }
+        
+        _lifecycleLock?.Dispose();
+    }
+
+    private bool ValidatePrerequisites()
+    {
+        if (ProxyExecutablePath is null || !File.Exists(ProxyExecutablePath))
+        {
+            AddLog($"❌ Missing thinking proxy at {ProxyExecutablePath ?? "(null)"}");
             return false;
         }
+
+        if (BackendExecutablePath is null || !File.Exists(BackendExecutablePath))
+        {
+            AddLog($"❌ Missing cli-proxy-api-plus at {BackendExecutablePath ?? "(null)"}");
+            return false;
+        }
+
+        if (BaseConfigPath is null || !File.Exists(BaseConfigPath))
+        {
+            AddLog("❌ Missing config.yaml");
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<bool> StartProxyWithRetryAsync(CancellationToken cancellationToken, int maxRetries = 2)
+    {
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            if (attempt > 0)
+            {
+                AddLog($"🔄 Retrying proxy start (attempt {attempt + 1}/{maxRetries + 1})...");
+                await Task.Delay(1000 * attempt, cancellationToken).ConfigureAwait(false);
+                await CleanupProxyAsync().ConfigureAwait(false);
+            }
+
+            if (await StartProxyAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task<bool> StartProxyAsync(CancellationToken cancellationToken)
+    {
+        if (ProxyExecutablePath is null) return false;
 
         var psi = new ProcessStartInfo
         {
@@ -359,6 +445,14 @@ public sealed class ServerManager
         psi.ArgumentList.Add(_proxyConfigWriter.ConfigPath);
 
         _proxyProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        
+        var tcs = new TaskCompletionSource<bool>();
+        _proxyProcess.Exited += (_, _) => 
+        {
+            tcs.TrySetResult(false);
+            OnProcessExited("proxy");
+        };
+
         _proxyProcess.OutputDataReceived += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
@@ -366,6 +460,7 @@ public sealed class ServerManager
                 AddLog(args.Data);
             }
         };
+        
         _proxyProcess.ErrorDataReceived += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
@@ -373,17 +468,13 @@ public sealed class ServerManager
                 AddLog("⚠️ " + args.Data);
             }
         };
-        _proxyProcess.Exited += (_, _) =>
-        {
-            AddLog("Thinking proxy stopped.");
-        };
 
         try
         {
             _proxyProcess.Start();
             _proxyProcess.BeginOutputReadLine();
             _proxyProcess.BeginErrorReadLine();
-            AddLog("✓ Thinking proxy started");
+            AddLog("✓ Thinking proxy process started");
             return true;
         }
         catch (Exception ex)
@@ -393,12 +484,9 @@ public sealed class ServerManager
         }
     }
 
-    private bool StartBackend(string configPath)
+    private async Task<bool> StartBackendAsync(string configPath, CancellationToken cancellationToken)
     {
-        if (BackendExecutablePath is null)
-        {
-            return false;
-        }
+        if (BackendExecutablePath is null) return false;
 
         var psi = new ProcessStartInfo
         {
@@ -414,6 +502,14 @@ public sealed class ServerManager
         psi.ArgumentList.Add(configPath);
 
         _backendProcess = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        
+        var tcs = new TaskCompletionSource<bool>();
+        _backendProcess.Exited += (_, _) => 
+        {
+            tcs.TrySetResult(false);
+            OnProcessExited("backend");
+        };
+
         _backendProcess.OutputDataReceived += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
@@ -421,6 +517,7 @@ public sealed class ServerManager
                 AddLog(args.Data);
             }
         };
+        
         _backendProcess.ErrorDataReceived += (_, args) =>
         {
             if (!string.IsNullOrWhiteSpace(args.Data))
@@ -428,19 +525,13 @@ public sealed class ServerManager
                 AddLog("⚠️ " + args.Data);
             }
         };
-        _backendProcess.Exited += (_, _) =>
-        {
-            AddLog("Backend stopped.");
-            IsRunning = false;
-            RunningChanged?.Invoke(false);
-        };
 
         try
         {
             _backendProcess.Start();
             _backendProcess.BeginOutputReadLine();
             _backendProcess.BeginErrorReadLine();
-            AddLog($"✓ Backend started on port {BackendPort}");
+            AddLog($"✓ Backend process started on port {BackendPort}");
             return true;
         }
         catch (Exception ex)
@@ -450,59 +541,74 @@ public sealed class ServerManager
         }
     }
 
-    private void StopProxy()
+    private async Task StopInternalAsync()
     {
-        if (_proxyProcess is null)
+        _healthCheckTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        await CleanupProcessesAsync().ConfigureAwait(false);
+        
+        var wasRunning = IsRunning;
+        IsRunning = false;
+        AddLog("✓ Server stopped");
+        
+        if (wasRunning)
         {
-            return;
+            _ = Task.Run(() => RunningChanged?.Invoke(false));
         }
+    }
+
+    private async Task CleanupProcessesAsync()
+    {
+        await CleanupProxyAsync().ConfigureAwait(false);
+        await CleanupBackendAsync().ConfigureAwait(false);
+    }
+
+    private async Task CleanupProxyAsync()
+    {
+        if (_proxyProcess is null) return;
 
         try
         {
             if (!_proxyProcess.HasExited)
             {
                 _proxyProcess.Kill(entireProcessTree: true);
-                _proxyProcess.WaitForExit(2000);
+                await Task.WhenAny(
+                    Task.Run(() => _proxyProcess.WaitForExit(2000)),
+                    Task.Delay(2500)
+                ).ConfigureAwait(false);
             }
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
         finally
         {
-            _proxyProcess.Dispose();
+            try { _proxyProcess.Dispose(); } catch { }
             _proxyProcess = null;
         }
     }
 
-    private void StopBackend()
+    private async Task CleanupBackendAsync()
     {
-        if (_backendProcess is null)
-        {
-            return;
-        }
+        if (_backendProcess is null) return;
 
         try
         {
             if (!_backendProcess.HasExited)
             {
                 _backendProcess.Kill(entireProcessTree: true);
-                _backendProcess.WaitForExit(2000);
+                await Task.WhenAny(
+                    Task.Run(() => _backendProcess.WaitForExit(2000)),
+                    Task.Delay(2500)
+                ).ConfigureAwait(false);
             }
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
         finally
         {
-            _backendProcess.Dispose();
+            try { _backendProcess.Dispose(); } catch { }
             _backendProcess = null;
         }
     }
 
-    private void KillOrphanedProcesses()
+    private async Task KillOrphanedProcessesAsync()
     {
         foreach (var name in new[] { "cli-proxy-api-plus", "thinking-proxy" })
         {
@@ -511,12 +617,104 @@ public sealed class ServerManager
                 try
                 {
                     process.Kill(entireProcessTree: true);
+                    await Task.Run(() => process.WaitForExit(2000)).ConfigureAwait(false);
                 }
-                catch
+                catch { }
+                finally
                 {
-                    // ignore
+                    try { process.Dispose(); } catch { }
                 }
             }
+        }
+    }
+
+    private void OnHealthCheckTick(object? state)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _lifecycleLock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    if (!IsRunning || _isDisposed) return;
+
+                    var proxyHealthy = IsProcessHealthy(_proxyProcess) && await IsPortRespondingAsync(ProxyPort).ConfigureAwait(false);
+                    var backendHealthy = IsProcessHealthy(_backendProcess) && await IsPortRespondingAsync(BackendPort).ConfigureAwait(false);
+
+                    if (!proxyHealthy || !backendHealthy)
+                    {
+                        _consecutiveFailures++;
+                        AddLog($"⚠️ Health check failed (attempt {_consecutiveFailures}/{MaxConsecutiveFailures})");
+
+                        if (_consecutiveFailures >= MaxConsecutiveFailures)
+                        {
+                            AddLog("❌ Max health check failures reached, restarting server...");
+                            await StopInternalAsync().ConfigureAwait(false);
+                            _lifecycleLock.Release();
+                            
+                            // Try to restart outside the lock
+                            await Task.Delay(1000).ConfigureAwait(false);
+                            await StartAsync().ConfigureAwait(false);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        if (_consecutiveFailures > 0)
+                        {
+                            AddLog("✓ Health check passed, server is healthy");
+                            _consecutiveFailures = 0;
+                        }
+                    }
+                }
+                finally
+                {
+                    if (_lifecycleLock.CurrentCount == 0)
+                    {
+                        _lifecycleLock.Release();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLog($"❌ Health check error: {ex.Message}");
+            }
+        });
+    }
+
+    private void OnProcessExited(string processType)
+    {
+        if (!IsRunning || _isDisposed) return;
+
+        AddLog($"⚠️ {processType} process exited unexpectedly");
+        _consecutiveFailures = MaxConsecutiveFailures; // Force restart on next health check
+    }
+
+    private static bool IsProcessHealthy(Process? process)
+    {
+        if (process is null) return false;
+        try
+        {
+            return !process.HasExited;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task<bool> IsPortRespondingAsync(int port)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync("127.0.0.1", port).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            return client.Connected;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -524,19 +722,23 @@ public sealed class ServerManager
     {
         var timestamp = DateTimeOffset.Now.ToString("T");
         _logBuffer.Append($"[{timestamp}] {message}");
-        LogUpdated?.Invoke(_logBuffer.ToList());
+        
+        // Fire event outside any lock
+        _ = Task.Run(() => LogUpdated?.Invoke(_logBuffer.ToList()));
     }
 
-    private static async Task<bool> WaitForPortAsync(int port, TimeSpan timeout)
+    private static async Task<bool> WaitForPortAsync(int port, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + timeout;
         while (DateTimeOffset.UtcNow < deadline)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
                 using var client = new TcpClient();
                 var connectTask = client.ConnectAsync("127.0.0.1", port);
-                var completed = await Task.WhenAny(connectTask, Task.Delay(100)).ConfigureAwait(false);
+                var completed = await Task.WhenAny(connectTask, Task.Delay(100, cancellationToken)).ConfigureAwait(false);
                 if (completed == connectTask && client.Connected)
                 {
                     return true;
@@ -547,10 +749,53 @@ public sealed class ServerManager
                 // retry
             }
 
-            await Task.Delay(50).ConfigureAwait(false);
+            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
         }
 
         return false;
+    }
+
+    private static List<Task> ScheduleAuthInputAsync(Process process, AuthCommand command, string? qwenEmail, CancellationToken cancellationToken)
+    {
+        var tasks = new List<Task>();
+
+        if (command == AuthCommand.GeminiLogin)
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false);
+                if (!process.HasExited)
+                {
+                    await process.StandardInput.WriteLineAsync().ConfigureAwait(false);
+                }
+            }, cancellationToken));
+        }
+
+        if (command == AuthCommand.CodexLogin)
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(12), cancellationToken).ConfigureAwait(false);
+                if (!process.HasExited)
+                {
+                    await process.StandardInput.WriteLineAsync().ConfigureAwait(false);
+                }
+            }, cancellationToken));
+        }
+
+        if (command == AuthCommand.QwenLogin && !string.IsNullOrWhiteSpace(qwenEmail))
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
+                if (!process.HasExited)
+                {
+                    await process.StandardInput.WriteLineAsync(qwenEmail!).ConfigureAwait(false);
+                }
+            }, cancellationToken));
+        }
+
+        return tasks;
     }
 
     private static string? ExtractCopilotCode(IEnumerable<string> output)

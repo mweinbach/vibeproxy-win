@@ -9,6 +9,7 @@ public sealed class ServiceViewModel : ObservableObject
     private bool _isEnabled = true;
     private bool _isAuthenticating;
     private bool _isExpanded;
+    private bool _isDisposed;
 
     public ServiceViewModel(ServiceType type, string iconUri, string? helpText)
     {
@@ -16,14 +17,8 @@ public sealed class ServiceViewModel : ObservableObject
         IconSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(iconUri));
         HelpText = helpText;
         Accounts = new ObservableCollection<AuthAccountViewModel>();
-        ConnectCommand = new RelayCommand(() => ConnectRequested?.Invoke(this));
-        RemoveCommand = new RelayCommand<AuthAccountViewModel>(account =>
-        {
-            if (account is not null)
-            {
-                RemoveRequested?.Invoke(this, account);
-            }
-        });
+        ConnectCommand = new RelayCommand(() => OnConnectRequested());
+        RemoveCommand = new RelayCommand<AuthAccountViewModel>(account => OnRemoveRequested(account));
     }
 
     public ServiceType Type { get; }
@@ -91,6 +86,8 @@ public sealed class ServiceViewModel : ObservableObject
 
     public void RefreshAccounts(IEnumerable<AuthAccount> accounts)
     {
+        if (_isDisposed) return;
+
         Accounts.Clear();
         foreach (var account in accounts)
         {
@@ -104,5 +101,21 @@ public sealed class ServiceViewModel : ObservableObject
 
         RaisePropertyChanged(nameof(HasAccounts));
         RaisePropertyChanged(nameof(SummaryText));
+    }
+
+    private void OnConnectRequested()
+    {
+        if (!_isDisposed)
+        {
+            ConnectRequested?.Invoke(this);
+        }
+    }
+
+    private void OnRemoveRequested(AuthAccountViewModel? account)
+    {
+        if (!_isDisposed && account is not null)
+        {
+            RemoveRequested?.Invoke(this, account);
+        }
     }
 }
