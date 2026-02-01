@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace VibeProxy.Core.Services;
 
-public sealed class ConfigManager
+public sealed class ConfigManager : IDisposable
 {
     private static readonly Dictionary<string, string> OAuthProviderKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -15,10 +15,28 @@ public sealed class ConfigManager
         ["qwen"] = "qwen"
     };
 
+    private readonly VibeProxy.Core.Utils.Debouncer _configDebouncer;
+    private FileSystemWatcher? _configWatcher;
+    private string? _baseConfigPath;
+    private SettingsStore? _settingsStore;
+    private bool _isDisposed;
+
     public string AuthDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cli-proxy-api");
+
+    public event Action? ConfigChanged;
+
+    public ConfigManager()
+    {
+        _configDebouncer = new VibeProxy.Core.Utils.Debouncer(TimeSpan.FromMilliseconds(500));
+    }
 
     public string GetMergedConfigPath(string baseConfigPath, SettingsStore settingsStore)
     {
+        if (_isDisposed) throw new ObjectDisposedException(nameof(ConfigManager));
+
+        _baseConfigPath = baseConfigPath;
+        _settingsStore = settingsStore;
+
         Directory.CreateDirectory(AuthDirectory);
 
         var zaiKeys = LoadZaiKeys(AuthDirectory);
@@ -26,6 +44,7 @@ public sealed class ConfigManager
 
         if (zaiKeys.Count == 0 && disabledProviders.Count == 0)
         {
+            StartConfigWatcher();
             return baseConfigPath;
         }
 
@@ -79,7 +98,73 @@ public sealed class ConfigManager
         var mergedContent = bundledContent + additional;
         var mergedPath = Path.Combine(AuthDirectory, "merged-config.yaml");
         File.WriteAllText(mergedPath, mergedContent);
+        
+        StartConfigWatcher();
+        
         return mergedPath;
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed) return;
+        
+        _isDisposed = true;
+        
+        if (_configWatcher != null)
+        {
+            _configWatcher.EnableRaisingEvents = false;
+            _configWatcher.Dispose();
+            _configWatcher = null;
+        }
+
+        _configDebouncer?.Dispose();
+    }
+
+    private void StartConfigWatcher()
+    {
+        if (_isDisposed || _configWatcher != null) return;
+
+        try
+        {
+            // Watch for Z.AI key changes
+            _configWatcher = new FileSystemWatcher(AuthDirectory, "zai-*.json")
+            {
+                IncludeSubdirectories = false,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size
+            };
+
+            _configWatcher.Created += OnConfigFileChanged;
+            _configWatcher.Changed += OnConfigFileChanged;
+            _configWatcher.Deleted += OnConfigFileChanged;
+            _configWatcher.Renamed += OnConfigFileChanged;
+            _configWatcher.EnableRaisingEvents = true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to start config watcher: {ex.Message}");
+        }
+    }
+
+    private void OnConfigFileChanged(object sender, FileSystemEventArgs e)
+    {
+        if (_isDisposed) return;
+
+        _configDebouncer.Execute(() =>
+        {
+            try
+            {
+                // Regenerate config when Z.AI keys change
+                if (_baseConfigPath != null && _settingsStore != null)
+                {
+                    GetMergedConfigPath(_baseConfigPath, _settingsStore);
+                    ConfigChanged?.Invoke();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Config regeneration failed: {ex.Message}");
+            }
+        });
     }
 
     private static List<string> LoadZaiKeys(string authDir)
