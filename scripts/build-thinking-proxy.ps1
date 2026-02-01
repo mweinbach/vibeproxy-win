@@ -17,13 +17,15 @@ if (-not $goExe) {
     }
 }
 
-if (-not (Test-Path $OutputDir)) {
-    New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$outputPath = Join-Path $repoRoot $OutputDir
+if (-not (Test-Path $outputPath)) {
+    New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
 }
 
 Write-Host "Building thinking proxy..."
-Push-Location "src\VibeProxy.Proxy"
-& $goExe build -o (Join-Path $PWD "..\..\$OutputDir\thinking-proxy.exe")
+Push-Location (Join-Path $repoRoot "src\\VibeProxy.Proxy")
+& $goExe build -o (Join-Path $outputPath "thinking-proxy.exe")
 Pop-Location
 
 Write-Host "Thinking proxy build complete."
