@@ -265,7 +265,7 @@ public partial class App : Application
         args.Handled = true;
     }
 
-    private void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs args)
+    private void OnDomainUnhandledException(object sender, System.UnhandledExceptionEventArgs args)
     {
         LogService.Write("Unhandled exception", args.ExceptionObject as Exception);
     }

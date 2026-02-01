@@ -61,14 +61,14 @@
                             <Border Style="{StaticResource CardBorderStyle}">
                                 <StackPanel Spacing="16">
                                     <StackPanel Orientation="Horizontal" Spacing="12">
-                                        <FontIcon Glyph="&#xE73E;" Foreground="{x:Bind ViewModel.IsServerRunning, Converter={StaticResource StatusBrush}}" />
+                                        <FontIcon Glyph="&#xE73E;" Foreground="{x:Bind ViewModel.IsServerRunning, Mode=OneWay, Converter={StaticResource StatusBrush}}" />
                                         <TextBlock Text="Server Status" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                        <TextBlock Text="{x:Bind ViewModel.ServerStatusText}" VerticalAlignment="Center" Foreground="Gray" />
+                                        <TextBlock Text="{x:Bind ViewModel.ServerStatusText, Mode=OneWay}" VerticalAlignment="Center" Foreground="Gray" />
                                     </StackPanel>
                                     
                                     <InfoBar IsOpen="True" 
                                              Severity="{x:Bind ViewModel.IsServerRunning, Mode=OneWay, Converter={StaticResource StatusToSeverityConverter}}"
-                                             Title="{x:Bind ViewModel.ServerStatusText}"
+                                             Title="{x:Bind ViewModel.ServerStatusText, Mode=OneWay}"
                                              Message="Proxy server is active and listening for local requests."
                                              IsClosable="False" />
 

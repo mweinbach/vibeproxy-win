@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:VibeProxy.WinUI"
+    xmlns:ui="using:Windows.UI"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
     <Application.Resources>
@@ -15,9 +16,9 @@
             </ResourceDictionary.MergedDictionaries>
             <!-- Other app resources here -->
             <!-- Modern color palette -->
-            <Color x:Key="AppPrimaryColor">#0078D4</Color>
-            <Color x:Key="AppSecondaryColor">#2B88D8</Color>
-            <Color x:Key="AppBackgroundTertiary">#1A1A1A</Color>
+            <ui:Color x:Key="AppPrimaryColor">#0078D4</ui:Color>
+            <ui:Color x:Key="AppSecondaryColor">#2B88D8</ui:Color>
+            <ui:Color x:Key="AppBackgroundTertiary">#1A1A1A</ui:Color>
             
             <SolidColorBrush x:Key="AppPrimaryBrush" Color="{StaticResource AppPrimaryColor}" />
             <SolidColorBrush x:Key="AppAccentBrush" Color="{StaticResource AppSecondaryColor}" />
