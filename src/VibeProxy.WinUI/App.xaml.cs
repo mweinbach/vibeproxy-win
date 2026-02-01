@@ -38,6 +38,9 @@ public partial class App : Application
         serverManager.SetResourceBasePath(AppContext.BaseDirectory);
         serverManager.LogUpdated += OnServerLogUpdated;
 
+        // Listen for config changes that require server restart
+        configManager.ConfigChanged += OnConfigChanged;
+
         var notificationService = new NotificationService();
         var trayService = new TrayService();
         var mainViewModel = new MainViewModel(settingsStore, authManager, serverManager);
@@ -224,6 +227,35 @@ public partial class App : Application
         catch (Exception ex)
         {
             LogService.Write("Failed to sync proxy config", ex);
+        }
+    }
+
+    private async void OnConfigChanged()
+    {
+        try
+        {
+            LogService.Write("Configuration changed, restarting server...");
+            
+            if (Services.ServerManager.IsRunning)
+            {
+                await Services.ServerManager.StopAsync();
+            }
+            
+            var success = await Services.ServerManager.StartAsync();
+            
+            if (success)
+            {
+                Services.NotificationService.Show("Config Updated", "Server restarted with new configuration");
+            }
+            else
+            {
+                Services.NotificationService.Show("Config Error", "Failed to restart server with new configuration");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogService.Write("Config change handling failed", ex);
+            Services.NotificationService.Show("Error", "Failed to apply configuration changes");
         }
     }
 
