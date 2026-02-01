@@ -11,6 +11,8 @@ public sealed class TrayService
 
     private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
     private TaskbarIcon? _trayIcon;
+    private BitmapImage? _activeIconImage;
+    private BitmapImage? _inactiveIconImage;
     private MenuFlyoutItem? _statusItem;
     private MenuFlyoutItem? _startStopItem;
     private MenuFlyoutItem? _copyUrlItem;
@@ -24,9 +26,11 @@ public sealed class TrayService
     public void Initialize(Microsoft.UI.Dispatching.DispatcherQueue dispatcher)
     {
         _dispatcher = dispatcher;
+        _activeIconImage = new BitmapImage(_activeIcon);
+        _inactiveIconImage = new BitmapImage(_inactiveIcon);
         _trayIcon = new TaskbarIcon
         {
-            IconSource = new BitmapImage(_inactiveIcon),
+            IconSource = _inactiveIconImage,
             ToolTipText = "VibeProxy"
         };
 
@@ -70,12 +74,23 @@ public sealed class TrayService
             return;
         }
 
-        if (_trayIcon is null)
+        if (_trayIcon is null || _trayIcon.IsDisposed)
         {
             return;
         }
 
-        _trayIcon.IconSource = new BitmapImage(isRunning ? _activeIcon : _inactiveIcon);
+        var nextIcon = isRunning ? _activeIconImage : _inactiveIconImage;
+        if (nextIcon is not null)
+        {
+            try
+            {
+                _trayIcon.IconSource = nextIcon;
+            }
+            catch (Exception ex)
+            {
+                LogService.Write("Tray icon update failed", ex);
+            }
+        }
 
         if (_statusItem is not null)
         {

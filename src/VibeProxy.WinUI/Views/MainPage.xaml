@@ -105,7 +105,7 @@
                                     <DataTemplate x:DataType="viewModels:ServiceViewModel">
                                         <Expander HorizontalAlignment="Stretch" Padding="0">
                                             <Expander.Header>
-                                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" VerticalAlignment="Center">
+                                                <Grid ColumnDefinitions="Auto,*,24,Auto" ColumnSpacing="12" VerticalAlignment="Center">
                                                     <Image Width="24" Height="24" Source="{x:Bind IconSource}" />
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" />
