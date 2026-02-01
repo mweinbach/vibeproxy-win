@@ -1,15 +1,13 @@
-using System.Drawing;
 using H.NotifyIcon;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace VibeProxy.WinUI.Services;
 
 public sealed class TrayService
 {
-    private readonly string _activeIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", "icon-active.ico");
-    private readonly string _inactiveIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Icons", "icon-inactive.ico");
-    private Icon? _activeIcon;
-    private Icon? _inactiveIcon;
+    private readonly Uri _activeIcon = new("ms-appx:///Assets/Icons/icon-active.ico");
+    private readonly Uri _inactiveIcon = new("ms-appx:///Assets/Icons/icon-inactive.ico");
 
     private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
     private TaskbarIcon? _trayIcon;
@@ -26,11 +24,9 @@ public sealed class TrayService
     public void Initialize(Microsoft.UI.Dispatching.DispatcherQueue dispatcher)
     {
         _dispatcher = dispatcher;
-        _activeIcon = LoadIcon(_activeIconPath);
-        _inactiveIcon = LoadIcon(_inactiveIconPath);
         _trayIcon = new TaskbarIcon
         {
-            Icon = _inactiveIcon,
+            IconSource = new BitmapImage(_inactiveIcon),
             ToolTipText = "VibeProxy"
         };
 
@@ -79,7 +75,7 @@ public sealed class TrayService
             return;
         }
 
-        _trayIcon.Icon = isRunning ? _activeIcon : _inactiveIcon;
+        _trayIcon.IconSource = new BitmapImage(isRunning ? _activeIcon : _inactiveIcon);
 
         if (_statusItem is not null)
         {
@@ -102,20 +98,4 @@ public sealed class TrayService
         _trayIcon?.Dispose();
     }
 
-    private static Icon? LoadIcon(string path)
-    {
-        if (!File.Exists(path))
-        {
-            return null;
-        }
-
-        try
-        {
-            return new Icon(path);
-        }
-        catch
-        {
-            return null;
-        }
-    }
 }
