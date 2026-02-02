@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="using:VibeProxy.WinUI.Helpers"
     xmlns:local="using:VibeProxy.WinUI"
     xmlns:ui="using:Windows.UI"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -15,6 +16,13 @@
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
             <!-- Other app resources here -->
+            <helpers:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+            <helpers:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+            <helpers:ExpiredToBrushConverter x:Key="ExpiredBrush" />
+            <helpers:StringToVisibilityConverter x:Key="StringToVisibility" />
+            <helpers:BoolToStatusBrushConverter x:Key="StatusBrush" />
+            <helpers:StatusToSeverityConverter x:Key="StatusToSeverityConverter" />
+
             <!-- Modern color palette -->
             <ui:Color x:Key="AppPrimaryColor">#0078D4</ui:Color>
             <ui:Color x:Key="AppSecondaryColor">#2B88D8</ui:Color>

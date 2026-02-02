@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="VibeProxy.WinUI.Views.Sections.SettingsSectionView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <StackPanel Spacing="24">
+        <Border Style="{StaticResource CardBorderStyle}">
+            <StackPanel Spacing="16">
+                <ToggleSwitch Header="Launch at Login"
+                              x:Name="LaunchToggle"
+                              Toggled="OnLaunchAtLoginToggled"
+                              OnContent="Enabled" OffContent="Disabled" />
+
+                <TextBlock Text="VibeProxy will automatically start when you sign in to Windows." FontSize="12" Foreground="Gray" Margin="0,-8,0,0" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource CardBorderStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Vercel AI Gateway" FontWeight="SemiBold" />
+                <ToggleSwitch Header="Use Gateway for Claude"
+                              IsOn="{x:Bind ViewModel.SettingsStore.VercelGatewayEnabled, Mode=TwoWay}"
+                              OnContent="On" OffContent="Off" />
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Vercel API Key" FontSize="12" />
+                    <PasswordBox Password="{x:Bind ViewModel.SettingsStore.VercelApiKey, Mode=TwoWay}" PlaceholderText="Enter API Key" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
